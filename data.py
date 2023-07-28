@@ -1,12 +1,15 @@
 import torch
 import os
 from PIL import Image
+from torchvision.datasets.mnist import read_image_file, read_label_file
+import torchvision.transforms as transforms
+
 
 class custom_MNIST(torch.utils.data.Dataset):
     training_file = "training.pt"
     test_file = "test.pt"
 
-    def __init__(self, root = './', train = True, transform=None):
+    def __init__(self, root, train = True, transform=None):
         super().__init__()
         self.root = root  
         self.train = train  # training set(True) or test set(False)
@@ -38,3 +41,14 @@ class custom_MNIST(torch.utils.data.Dataset):
 
     def __len__(self):
         return len(self.data)
+
+
+def get_data(args):
+    transform = transforms.Compose([transforms.ToTensor()])
+    train_dataset = custom_MNIST(root=args.data_path, train=True, transform=transform)
+    test_dataset = custom_MNIST(root=args.data_path, train=False, transform=transform)
+    
+    train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=32, shuffle=True)
+    test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=32, shuffle=False)
+    
+    return train_loader, test_loader

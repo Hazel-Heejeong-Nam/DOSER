@@ -16,28 +16,30 @@ class doser(Basic):
         self.net = net
         self.content_enc = self.encoder1
         self.style_enc = self.encoder2
-        self.decode= nn.Sequential(
-            nn.Linear(320+640, 1920),
-            nn.ReLU(),
-            nn.Linear(1920, 1920),
-            nn.ReLU(),
-            nn.Linear(1920, 2880),
-            nn.ReLU(),
-            nn.Linear(2880, 3072),
-            nn.Sigmoid()
-        )
+        if args.backbone == 'Toy':
+            self.decode= nn.Sequential(
+                nn.Linear(32+64, 256),
+                nn.ReLU(),
+                nn.Linear(256, 512),
+                nn.ReLU(),
+                nn.Linear(512, 1024),
+                nn.ReLU(),
+                nn.Linear(1024, 3072),
+                nn.Sigmoid()
+            )
+        elif args.backbone == 'WideResnet':
+            self.decode= nn.Sequential(
+                nn.Linear(320+640, 1920),
+                nn.ReLU(),
+                nn.Linear(1920, 1920),
+                nn.ReLU(),
+                nn.Linear(1920, 2880),
+                nn.ReLU(),
+                nn.Linear(2880, 3072),
+                nn.Sigmoid()
+            )
         
         self.GAP = nn.AdaptiveAvgPool2d(1)
-    
-    def mixing(self,emb, keep_ratio=0):
-        idx = torch.randperm(emb.size(0))
-        emb = keep_ratio * emb + (1 - keep_ratio) * emb[idx]
-        return emb
-    
-    def to_open(self,emb):
-        close_emb = self.c_classifier(emb)
-        open_emb = self.o_classifier(emb)
-        return torch.cat((open_emb, close_emb), dim=-1)
         
         
     def forward(self, x, mode='eval', stage=0):
@@ -57,18 +59,20 @@ class doser(Basic):
         
         c = self.GAP(c).view(x.size(0),-1) # bs x 320
         mixed_c = self.GAP(mixed_c).view(x.size(0),-1) # bs x 320
-        # if args.backbone != 'WideResnet':
-        #     s = self.GAP(s).view(x.size(0),-1) 
-        #     s_from_mc = self.GAP(s_from_mc).view(x.size(0),-1)
-        #     mixed_s = self.GAP(mixed_s).view(x.size(0),-1)
+        if self.backbone != 'WideResnet':
+            s = self.GAP(s).view(x.size(0),-1) 
+            s_from_mc = self.GAP(s_from_mc).view(x.size(0),-1)
+            mixed_s = self.GAP(mixed_s).view(x.size(0),-1)
         
         id_logits = self.to_open(s)
-        ood_logits = self.to_open(s_from_mc)
-        recon = self.decode(torch.cat((c, mixed_s),dim=1)) # decode의 input : bs x 960
-        
+        ood_logits = self.to_open(s_from_mc)        
+        if mode=='pretrain':
+            recon = self.decode(torch.cat((c, s),dim=1)) # decode의 input : bs x 960
+            return id_logits, ood_logits, recon
         if mode=='train':
+            recon = self.decode(torch.cat((c, mixed_s),dim=1)) # decode의 input : bs x 960
             return id_logits, ood_logits, recon
             
         else : 
 
-            return id_logits.cpu()
+            return id_logits

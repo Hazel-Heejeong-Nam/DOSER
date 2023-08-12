@@ -16,23 +16,23 @@ class Proser(Basic):
             c1 = self.encoder1(g1)
             mixed_c1 = self.mixing(c1)
             s1 = self.encoder2(mixed_c1)
-            s1 = self.GAP(s1).view(g1.size(0),-1)
+            #s1 = self.GAP(s1).view(g1.size(0),-1)
             logit1 = self.to_open(s1)
 
 
             c2 = self.encoder1(g2)
             s2 = self.encoder2(c2)
-            s2 = self.GAP(s2).view(g1.size(0),-1)
+            #s2 = self.GAP(s2).view(g1.size(0),-1)
             logit2 = self.to_open(s2)
 
-            return logit1, logit2
+            return logit1, logit2, None
             
         else : 
             c = self.encoder1(x.cuda())
             s = self.encoder2(c)
             s = self.GAP(s).view(x.size(0),-1)
             logit = self.to_open(s)
-            return logit.cpu()
+            return logit
 
 
 class efficient_Proser(Basic):
@@ -50,17 +50,17 @@ class efficient_Proser(Basic):
         
         c = self.GAP(c).view(x.size(0),-1)
         mixed_c = self.GAP(mixed_c).view(x.size(0),-1)
-        s = self.GAP(s).view(x.size(0),-1)
-        s_from_mc = self.GAP(s_from_mc).view(x.size(0),-1)
+        # s = self.GAP(s).view(x.size(0),-1)
+        # s_from_mc = self.GAP(s_from_mc).view(x.size(0),-1)
 
         
         id_logits = self.to_open(s)
         ood_logits = self.to_open(s_from_mc)
         
         if mode=='train':
-            return id_logits, ood_logits
+            return id_logits, ood_logits, None
             
         else : 
-            return id_logits.cpu()
+            return id_logits
 
 

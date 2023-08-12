@@ -116,7 +116,7 @@ class MNIST_OSR(object):
         pin_memory = True if use_gpu else False
 
         trainset = MNIST_Filter(root=dataroot, train=True, download=True, transform=train_transform)
-        print('All Train Data:', len(trainset))
+        #print('All Train Data:', len(trainset))
         trainset.__Filter__(known=self.known)
         
         self.train_loader = torch.utils.data.DataLoader(
@@ -125,7 +125,7 @@ class MNIST_OSR(object):
         )
         
         testset = MNIST_Filter(root=dataroot, train=False, download=True, transform=transform)
-        print('All Test Data:', len(testset))
+        #print('All Test Data:', len(testset))
         testset.__Filter__(known=self.known)
         
         self.test_loader = torch.utils.data.DataLoader(
@@ -141,8 +141,8 @@ class MNIST_OSR(object):
             num_workers=num_workers, pin_memory=pin_memory,
         )
 
-        print('Train: ', len(trainset), 'Test: ', len(testset), 'Out: ', len(outset))
-        print('All Test: ', (len(testset) + len(outset)))
+        #print('Train: ', len(trainset), 'Test: ', len(testset), 'Out: ', len(outset))
+        #print('All Test: ', (len(testset) + len(outset)))
 
 class CIFAR10_Filter(CIFAR10):
     """CIFAR10 Dataset.

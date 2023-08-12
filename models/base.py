@@ -26,30 +26,71 @@ class latter2block(nn.Module):
 class Basic(nn.Module):
     def __init__(self,args,net):
         super(Basic, self).__init__()
-
         self.net = net
-        self.encoder1 =pre2block(net)
-        self.encoder2 =latter2block(net)
         self.num_class = len(args.cls_known)
-        # closed set classifier
-        self.c_classifier =  nn.Sequential(
-            nn.Linear(640, 320),
-            nn.ReLU(),
-            nn.Linear(320,80),
-            nn.ReLU(),
-            nn.Linear(80,self.num_class)
-        )
-        
-        # open set classifier
-        self.o_classifier = nn.Sequential(
-            nn.Linear(640, 320),
-            nn.ReLU(),
-            nn.Linear(320,160),
-            nn.ReLU(),
-            nn.Linear(160,40),
-            nn.ReLU(),
-            nn.Linear(40,1)
-        )
+        self.backbone = args.backbone
+        if self.backbone == 'Toy': # define toy network
+            self.encoder1 = nn.Sequential(
+                nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1),
+                nn.BatchNorm2d(16),
+                nn.ReLU(),
+                nn.Conv2d(16, 32, kernel_size=3, stride=1, padding=1),
+                nn.BatchNorm2d(32),
+                nn.ReLU(),
+                nn.MaxPool2d(kernel_size=2)
+            )
+            self.encoder2  = nn.Sequential(
+                nn.Conv2d(32, 64, kernel_size=3, stride=1, padding=1),
+                nn.BatchNorm2d(64),
+                nn.ReLU(),
+                nn.MaxPool2d(kernel_size=2),
+                nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),
+                nn.BatchNorm2d(64),
+                nn.ReLU(),
+                nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),
+                nn.BatchNorm2d(64),
+                nn.ReLU()
+            )
+            # closed set classifier
+            self.c_classifier =  nn.Sequential(
+                nn.Linear(64, 32),
+                nn.ReLU(),
+                nn.Linear(32,32),
+                nn.ReLU(),
+                nn.Linear(32,self.num_class)
+            )
+            # open set classifier
+            self.o_classifier = nn.Sequential(
+                nn.Linear(64, 32),
+                nn.ReLU(),
+                nn.Linear(32,16),
+                nn.ReLU(),
+                nn.Linear(16,16),
+                nn.ReLU(),
+                nn.Linear(16,1)
+            )
+
+        elif self.backbone == 'WideResnet' :
+            self.encoder1 =pre2block(net)
+            self.encoder2 =latter2block(net)
+            # closed set classifier
+            self.c_classifier =  nn.Sequential(
+                nn.Linear(640, 320),
+                nn.ReLU(),
+                nn.Linear(320,80),
+                nn.ReLU(),
+                nn.Linear(80,self.num_class)
+            )
+            # open set classifier
+            self.o_classifier = nn.Sequential(
+                nn.Linear(640, 320),
+                nn.ReLU(),
+                nn.Linear(320,160),
+                nn.ReLU(),
+                nn.Linear(160,40),
+                nn.ReLU(),
+                nn.Linear(40,1)
+            )
         
         
         self.GAP = nn.AdaptiveAvgPool2d(1)

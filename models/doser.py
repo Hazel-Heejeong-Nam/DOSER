@@ -52,10 +52,10 @@ class doser(Basic):
         x = x.cuda() # bs x channel x imgsize x imgsize
         
         c = self.content_enc(x) # bs x 320, 16, 16
-        mixed_c = self.mixing(c)
+        mixed_c = self.mixing(c, keep_ratio=self.keep_ratio)
         s = self.style_enc(c) # bs x 640
         s_from_mc = self.style_enc(mixed_c)
-        mixed_s = self.mixing(s)
+        mixed_s = self.mixing(s, keep_ratio=self.keep_ratio)
         
         c = self.GAP(c).view(x.size(0),-1) # bs x 320
         mixed_c = self.GAP(mixed_c).view(x.size(0),-1) # bs x 320

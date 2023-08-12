@@ -37,7 +37,9 @@ def pretrain(args, loader, optimizer, model):
             start_time = time.time()
     return model
 
-def train(args, loader, optimizer, model):
+def train(args, loader, optimizer, model, scheduler, params):
+    a,b,c,d =params
+    #print(a,b,c,d)
     class_cri = nn.CrossEntropyLoss()
     reconstruction_loss = nn.MSELoss()
     # Training
@@ -63,7 +65,7 @@ def train(args, loader, optimizer, model):
                 recon_loss = reconstruction_loss(recons.cpu(), images.view(images.size(0), -1))
             else : # recon =None
                 recon_loss = 0
-            total_loss = mixing_loss * args.a + class_loss * args.b + muted_loss * args.c + recon_loss * args.d
+            total_loss = mixing_loss * a + class_loss * b + muted_loss * c + recon_loss * d
             total_loss.backward()
             total_loss1 += mixing_loss.item()
             total_loss2 += class_loss.item()
@@ -79,7 +81,9 @@ mute loss : {total_loss3/((idx+1)*args.print_epoch):.4f}, recon : {total_recon/(
             start_time = time.time()
 
         if (epoch +1) % args.param_schedule == 0:
-            args.a, args.b, args.c, args.d = param_schedule(args.a, args.b, args.c, args.d, args.param_step)    
+            a,b,c,d = param_schedule(a,b,c,d, args.param_step)   
+
+        scheduler.step() 
     return model
             
 def validate(args,model, testloader, outloader):  

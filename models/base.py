@@ -29,6 +29,7 @@ class Basic(nn.Module):
         self.net = net
         self.num_class = len(args.cls_known)
         self.backbone = args.backbone
+        self.keep_ratio = args.lambda1
         if self.backbone == 'Toy': # define toy network
             self.encoder1 = nn.Sequential(
                 nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1),

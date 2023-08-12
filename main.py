@@ -41,7 +41,7 @@ def run_fold(args, fold):
 
     model = models.__dict__[args.model](args,backbone).to(args.device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.pretrain_epochs+args.train_epochs)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.train_epochs, eta_min=args.lr*0.01)
     if validate and (args.checkpoint !=None):
         try :
             state_dict = torch.load(args.checkpoint)
@@ -51,7 +51,7 @@ def run_fold(args, fold):
             ValueError(f"Cannot load weight from {args.checkpoint}")       
     else :
         model = pretrain(args, trainloader, optimizer, model)
-        model = train(args, trainloader, optimizer, model)
+        model = train(args, trainloader, optimizer, model, scheduler, params=[args.a, args.b, args.c, args.d])
     model.eval()
     in_acc ,ood_acc, auc = validate(args, model, testloader, outloader)
     txt_name = f'{args.model}_{args.dataset}_{args.backbone}.txt'
@@ -71,13 +71,13 @@ def arg_parser():
     parser.add_argument('--img_size', type=int, default=32)
     parser.add_argument('--data_root', default='../../data')
 
-    parser.add_argument('--param_schedule', type=int, default=8, help='epoch to schedule parameters')
-    parser.add_argument('--param_step', type=float, default=0.05, help='epoch to schedule parameters')
+    parser.add_argument('--param_schedule', type=int, default=5, help='epoch to schedule parameters')
+    parser.add_argument('--param_step', type=float, default=0.02, help='epoch to schedule parameters')
     parser.add_argument('--lr', default=0.0003, type=float)
     parser.add_argument('--model', default='doser', help='proser | efficient_proser | doser')
     parser.add_argument('--backbone', default='Toy', help='WideResnet | Toy')
     parser.add_argument('--dataset', type=str, default='mnist', help="mnist | svhn | cifar10 | cifar100(보류) | tiny_imagenet")
-    #parser.add_argument('--lambda', default=0, type=float, help='ratio to keep original representation while doing manifold mix-up')
+    parser.add_argument('--lambda1', default=0, type=float, help='ratio to keep original representation while doing manifold mix-up')
     parser.add_argument('--a', default= 0.5, type=float, help = 'weight for the mix loss')
     parser.add_argument('--b', default= 1, type=float, help='weight for the class loss')
     parser.add_argument('--c', default= 1, type=float, help = 'weight for the mute loss')
@@ -99,7 +99,7 @@ if __name__ == "__main__":
     random.seed(0)
     torch.manual_seed(0)
     torch.cuda.manual_seed_all(0)
-    exp_name = f'{datetime.date.today().strftime("%m%d%Y")}_lr{args.lr}_abcd_{args.a}_{args.b}_{args.c}_{args.d}_paramupdate_{args.param_step}_per_{args.param_schedule}epoch'
+    exp_name = f'{datetime.date.today().strftime("%m%d%Y")}_lr{args.lr}_abcd_{args.a}_{args.b}_{args.c}_{args.d}_paramupdate_{args.param_step}_per_{args.param_schedule}epoch_lambda{args.lambda1}'
     print(exp_name)
     cls_config = splits_AUROC
 

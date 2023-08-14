@@ -24,8 +24,11 @@ def pretrain(args, loader, optimizer, model):
             labels = labels.to(args.device) 
             
             id_logits, _, recon = model(images,mode='pretrain')
-            class_loss = class_cri(id_logits, labels)
-            recon_loss = reconstruction_loss(recon.cpu(), images.view(images.size(0), -1))
+            class_loss = class_cri(id_logits, labels[:len(id_logits)])
+            if recon==None :
+                recon_loss = 0
+            else :
+                recon_loss = reconstruction_loss(recon.cpu(), images.view(images.size(0), -1))
             
             pre_loss = class_loss + recon_loss
             pre_loss.backward()
@@ -58,9 +61,9 @@ def train(args, loader, optimizer, model, scheduler, params):
             id_logits, ood_logits, recons = model(images, mode='train')
             muted_logits = mute_max(id_logits.clone())
             
-            mixing_loss = class_cri(ood_logits, ood_label) 
-            class_loss = class_cri(id_logits, labels) 
-            muted_loss = class_cri(muted_logits, ood_label)
+            mixing_loss = class_cri(ood_logits, ood_label[:len(id_logits)]) 
+            class_loss = class_cri(id_logits, labels[:len(id_logits)]) 
+            muted_loss = class_cri(muted_logits, ood_label[:len(id_logits)])
             if recons != None:
                 recon_loss = reconstruction_loss(recons.cpu(), images.view(images.size(0), -1))
             else : # recon =None
@@ -70,20 +73,27 @@ def train(args, loader, optimizer, model, scheduler, params):
             total_loss1 += mixing_loss.item()
             total_loss2 += class_loss.item()
             total_loss3 += muted_loss.item()
-            total_recon += recon_loss.item()
+            if recons != None : 
+                total_recon += recon_loss.item()
             optimizer.step()
     
             
         if (epoch+1) % args.print_epoch == 0:
-            print(f'Epoch : {epoch}, mix loss : {total_loss1/((idx+1)*args.print_epoch):.4f}, cls loss : {total_loss2/((idx+1)*args.print_epoch):.4f}, \
+            if recons !=None : 
+                print(f'Epoch : {epoch}, mix loss : {total_loss1/((idx+1)*args.print_epoch):.4f}, cls loss : {total_loss2/((idx+1)*args.print_epoch):.4f}, \
 mute loss : {total_loss3/((idx+1)*args.print_epoch):.4f}, recon : {total_recon/((idx+1)*args.print_epoch):.4f}, \
     time elapsed : {time.time()-start_time:.4f}sec')
+            else :
+                print(f'Epoch : {epoch}, mix loss : {total_loss1/((idx+1)*args.print_epoch):.4f}, cls loss : {total_loss2/((idx+1)*args.print_epoch):.4f}, \
+mute loss : {total_loss3/((idx+1)*args.print_epoch):.4f}, time elapsed : {time.time()-start_time:.4f}sec')
+
+
             start_time = time.time()
 
         if (epoch +1) % args.param_schedule == 0:
             a,b,c,d = param_schedule(a,b,c,d, args.param_step)   
-
-        scheduler.step() 
+        if args.lr_schedule ==True:
+            scheduler.step() 
     return model
             
 def validate(args,model, testloader, outloader):  
@@ -127,10 +137,11 @@ def validate(args,model, testloader, outloader):
 
     in_acc = float(correct_id) * 100. / float(total_id)
     ood_acc = float(correct_ood) * 100. / float(total_ood)
-    print(f'in-distribution acc: {in_acc:.5f}\nout-of-distribution acc : {ood_acc:.5f}')
+    avg_acc = float(correct_id+correct_ood)* 100. / float(total_id+total_ood)
+    print(f'in-distribution acc: {in_acc:.5f}\nout-of-distribution acc : {ood_acc:.5f}\n average acc : {avg_acc:.5f}')
 
     open_labels = open_labels[:n].cpu().numpy()
     prob = probs[:n].reshape(-1, 1)
     auc = roc_auc_score(open_labels, prob)
     print(f'auc : {auc:.5f}')
-    return in_acc,ood_acc, auc
+    return in_acc,ood_acc,avg_acc, auc

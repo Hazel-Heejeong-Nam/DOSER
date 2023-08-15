@@ -28,16 +28,16 @@ class Proser(Basic):
             s1 = self.encoder2(mixed_c1)
             if self.backbone !='WideResnet':
                 s1 = self.GAP(s1).view(g1.size(0),-1)
-            logit1 = self.to_open(s1)
+            ood_logits = self.to_open(s1)
 
 
             c2 = self.encoder1(g2)
             s2 = self.encoder2(c2)
             if self.backbone !='WideResnet':
                 s2 = self.GAP(s2).view(g1.size(0),-1)
-            logit2 = self.to_open(s2)
+            id_logits = self.to_open(s2)
 
-            return logit1, logit2, None
+            return id_logits, ood_logits, None
             
         else : 
             c = self.encoder1(x.cuda())

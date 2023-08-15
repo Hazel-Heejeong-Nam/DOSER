@@ -53,8 +53,9 @@ def train(args, loader, optimizer, model, scheduler, params):
         total_loss3 = 0
         total_recon = 0
         for idx, (images, labels) in enumerate(loader):
-    
+            
             labels = labels.to(args.device) # labels 32  
+            half_len = labels.size(0)//2
             ood_label = torch.ones_like(labels).to(args.device)*len(args.cls_known)
             
             optimizer.zero_grad()
@@ -62,7 +63,10 @@ def train(args, loader, optimizer, model, scheduler, params):
             muted_logits = mute_max(id_logits.clone())
             
             mixing_loss = class_cri(ood_logits, ood_label[:len(id_logits)]) 
-            class_loss = class_cri(id_logits, labels[:len(id_logits)]) 
+            if args.model=='Proser':
+                class_loss = class_cri(id_logits, labels[half_len:half_len*2]) 
+            else :
+                class_loss = class_cri(id_logits, labels) 
             muted_loss = class_cri(muted_logits, ood_label[:len(id_logits)])
             if recons != None:
                 recon_loss = reconstruction_loss(recons.cpu(), images.view(images.size(0), -1))

@@ -2,15 +2,7 @@ import time
 import torch
 from torch import nn
 from sklearn.metrics import roc_curve, roc_auc_score
-
-def mute_max(logits):
-    min_values, _ = torch.min(logits, dim=1, keepdim=True)
-    max_values, _ = torch.max(logits, dim=1, keepdim=True)
-    muted = torch.where(logits == max_values, min_values, logits)
-    return muted
-
-def param_schedule(a,b,c,d,step):
-    return a+step, b, c-step, d-step
+from utils import mute_max, param_schedule
 
 def pretrain(args, loader, optimizer, model):
     class_cri = nn.CrossEntropyLoss()

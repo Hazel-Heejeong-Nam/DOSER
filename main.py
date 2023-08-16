@@ -5,34 +5,22 @@ import torchvision.transforms as transforms
 import matplotlib.pyplot as plt
 import os
 from torchvision import transforms, utils, models
-from data import MNIST_OSR, CIFAR10_OSR, CIFAR100_OSR, SVHN_OSR, Tiny_ImageNet_OSR
+from utils.data import MNIST_OSR, CIFAR10_OSR, CIFAR100_OSR, SVHN_OSR, Tiny_ImageNet_OSR
 import torch.nn as nn
 import argparse
 import time
 import random
-from data import get_data
 import models
 from train import pretrain, train, validate
 import datetime
-from models.wide_resnet import Wide_ResNet
 from split import splits_AUROC, splits_F1
+from utils import load_model, get_loaders, Wide_ResNet
 
 
 def run_fold(args, fold):
     print(f'FOLD {fold} starts')
     data_path = os.path.join(args.data_root, args.dataset)
-    if 'mnist' in args.dataset:
-        Data = MNIST_OSR(known=args.cls_known, dataroot=data_path, batch_size=args.batch_size,img_size=args.img_size)
-        trainloader, testloader, outloader = Data.train_loader, Data.test_loader, Data.out_loader
-    elif 'cifar10' == args.dataset:
-        Data = CIFAR10_OSR(known=args.cls_known, dataroot=data_path, batch_size=args.batch_size,img_size=args.img_size)
-        trainloader, testloader, outloader = Data.train_loader, Data.test_loader, Data.out_loader
-    elif 'svhn' in args.dataset:
-        Data = SVHN_OSR(known=args.cls_known, dataroot=data_path, batch_size=args.batch_size,img_size=args.img_size)
-        trainloader, testloader, outloader = Data.train_loader, Data.test_loader, Data.out_loader
-    else:
-        Data = Tiny_ImageNet_OSR(known=args.cls_known, dataroot=data_path, batch_size=args.batch_size,img_size=args.img_size)
-        trainloader, testloader, outloader = Data.train_loader, Data.test_loader, Data.out_loader
+    trainloader, testloader, outloader = get_loaders(args)
 
     if args.backbone == 'WideResnet':
         backbone = Wide_ResNet(depth=28, widen_factor=10, dropout_rate=0.3, num_classes=len(args.cls_known)) # proser default setting
@@ -41,27 +29,29 @@ def run_fold(args, fold):
 
     model = models.__dict__[args.model](args,backbone).to(args.device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
-    if args.lr_schedule==True:
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.train_epochs, eta_min=args.lr*0.01)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.train_epochs, eta_min=args.lr*0.01) if args.lr_schedule == True else None
+
+    if args.validate and (args.checkpoint !=None):
+        model = load_model(args,model)  
     else :
-        scheduler = None
-    if validate and (args.checkpoint !=None):
-        try :
-            state_dict = torch.load(args.checkpoint)
-            missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False)
-            assert missing_keys == [] and unexpected_keys == []
-        except :
-            ValueError(f"Cannot load weight from {args.checkpoint}")       
-    else :
-        model = pretrain(args, trainloader, optimizer, model)
+        if args.checkpoint !=None and 'pretrain' in args.checkpoint: 
+            model = load_model(args,model)  
+        else:
+            model = pretrain(args, trainloader, optimizer, model)
+            if args.save_model :
+                os.makedirs(args.save_path, exist_ok=True)
+                torch.save(model.state_dict, os.path.join(args.save_path, f'pretrain_{args.model}_{args.dataset}_{args.backbone}_epoch{args.pretrain_epochs}_lr{args.lr}_fold{fold}.pth'))
         model = train(args, trainloader, optimizer, model, scheduler, params=[args.a, args.b, args.c, args.d])
+    
     model.eval()
+
     in_acc ,ood_acc, avg_acc, auc = validate(args, model, testloader, outloader)
     txt_name = f'{args.model}_{args.dataset}_{args.backbone}.txt'
     with open(txt_name, 'a' if os.path.isfile(txt_name) else 'w') as f:
         f.write(f'Fold {fold}  |  closed acc : {in_acc:.5f}  |  open acc : {ood_acc:.5f}  |  mean acc : {avg_acc:.5f}  |  AUC : {auc:.5f}\n')
 
     return in_acc ,ood_acc, avg_acc, auc
+
 def main_worker(args):
     exp_name = f'{datetime.date.today().strftime("%m%d%Y")}_lr{args.lr}_abcd_{args.a}_{args.b}_{args.c}_{args.d}_paramupdate_{args.param_step}_per_{args.param_schedule}epoch_lambda{args.lambda1}'
     print(exp_name)
@@ -91,8 +81,8 @@ def main_worker(args):
 def arg_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument('--num_fold', type=int, default=1)
-    parser.add_argument('--pretrain_epochs', default=5, type=int)
-    parser.add_argument('--train_epochs', default=10, type=int)
+    parser.add_argument('--pretrain_epochs', default=50, type=int)
+    parser.add_argument('--train_epochs', default=50, type=int)
     parser.add_argument('--device', default='cuda:0',type=str)
     parser.add_argument('--print_epoch', default=1,type=int)
     parser.add_argument('--batch_size', type=int, default=32)
@@ -100,20 +90,20 @@ def arg_parser():
     parser.add_argument('--data_root', default='../../data')
 
 
-    parser.add_argument('--model', default='Proser', help='Proser | efficient_Proser | doser')
-    parser.add_argument('--backbone', default='Toy', help='WideResnet | Toy')
-    parser.add_argument('--dataset', type=str, default='mnist', help="mnist | svhn | cifar10 | tiny_imagenet")
-    parser.add_argument('--param_schedule', type=int, default=4, help='epoch to schedule parameters')
-    parser.add_argument('--param_step', type=float, default=0.03, help='epoch to schedule parameters')
-    parser.add_argument('--lr_schedule', type=bool,default=False )
+    parser.add_argument('--model', default='doser', help='Proser | efficient_Proser | doser')
+    parser.add_argument('--backbone', default='WideResnet', help='WideResnet | Toy')
+    parser.add_argument('--dataset', type=str, default='cifar10', help="mnist | svhn | cifar10 | tiny_imagenet")
+    parser.add_argument('--param_schedule', type=int, default=10, help='epoch to schedule parameters')
+    parser.add_argument('--param_step', type=float, default=0.02, help='epoch to schedule parameters')
+    parser.add_argument('--lr_schedule', type=bool,default=True )
 
 
     parser.add_argument('--lr', default=0.0003, type=float)
     parser.add_argument('--lambda1', default=0, type=float, help='ratio to keep original representation while doing manifold mix-up')
     parser.add_argument('--a', default= 0.5, type=float, help = 'weight for the mix loss')
     parser.add_argument('--b', default= 1, type=float, help='weight for the class loss')
-    parser.add_argument('--c', default= 0.8, type=float, help = 'weight for the mute loss')
-    parser.add_argument('--d', default= 0.3, type=float, help = 'weight for the reconloss')
+    parser.add_argument('--c', default= 1, type=float, help = 'weight for the mute loss')
+    parser.add_argument('--d', default= 0.5, type=float, help = 'weight for the reconloss')
 
     # val and save
     parser.add_argument('--checkpoint', default=None)

@@ -3,6 +3,9 @@ import torch
 from torch import nn
 from sklearn.metrics import roc_curve, roc_auc_score
 from utils import mute_max, param_schedule
+import matplotlib.pyplot as plt
+from PIL import Image
+import cv2
 
 def pretrain(args, loader, optimizer, model):
     class_cri = nn.CrossEntropyLoss()
@@ -141,3 +144,15 @@ def validate(args,model, testloader, outloader):
     auc = roc_auc_score(open_labels, prob)
     print(f'auc : {auc:.5f}')
     return in_acc,ood_acc,avg_acc, auc
+
+def get_pic(args, model, train_loader):
+    model.eval()
+    for idx, (images, labels) in enumerate(train_loader):
+        id_logits, ood_logits, fake = model(images, mode='analysis')
+        fake = fake.detach().cpu().reshape(images.shape).permute(0,2,3,1).numpy()
+        for i in range(10):
+            img = fake[i]
+            plt.imsave(f'{args.model}_{i}.jpg', img)
+        if idx ==0 :
+            break
+

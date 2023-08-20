@@ -11,7 +11,7 @@ import argparse
 import time
 import random
 import models
-from train import pretrain, train, validate
+from train import pretrain, train, validate, get_pic
 import datetime
 from split import splits_AUROC, splits_F1
 from utils import load_model, get_loaders, Wide_ResNet
@@ -40,11 +40,14 @@ def run_fold(args, fold):
             model = pretrain(args, trainloader, optimizer, model)
             if args.save_model :
                 os.makedirs(args.save_path, exist_ok=True)
-                torch.save(model.state_dict, os.path.join(args.save_path, f'pretrain_{args.model}_{args.dataset}_{args.backbone}_epoch{args.pretrain_epochs}_lr{args.lr}_fold{fold}.pth'))
+                torch.save(model.state_dict(), os.path.join(args.save_path, f'new_pretrain_{args.model}_{args.dataset}_{args.backbone}_epoch{args.pretrain_epochs}_lr{args.lr}_fold{fold}.pth'))
         model = train(args, trainloader, optimizer, model, scheduler, params=[args.a, args.b, args.c, args.d])
-    
+        if args.save_model :
+            os.makedirs(args.save_path, exist_ok=True)
+            torch.save(model.state_dict(), os.path.join(args.save_path, f'new_train_{args.model}_{args.dataset}_{args.backbone}_train{args.train_epochs}_lr{args.lr}_schedule_{args.lr_schedule}_abcd_{args.a}_{args.b}_{args.c}_{args.d}_paramupdate_{args.param_step}_per_{args.param_schedule}epoch_fold{fold}.pth'))
     model.eval()
-
+    if args.analysis :
+        get_pic(args,model, trainloader)
     in_acc ,ood_acc, avg_acc, auc = validate(args, model, testloader, outloader)
     txt_name = f'{args.model}_{args.dataset}_{args.backbone}.txt'
     with open(txt_name, 'a' if os.path.isfile(txt_name) else 'w') as f:
@@ -81,35 +84,36 @@ def main_worker(args):
 def arg_parser():
     parser = argparse.ArgumentParser()
     parser.add_argument('--num_fold', type=int, default=1)
-    parser.add_argument('--pretrain_epochs', default=50, type=int)
-    parser.add_argument('--train_epochs', default=50, type=int)
+    parser.add_argument('--pretrain_epochs', default=30, type=int)
+    parser.add_argument('--train_epochs', default=30, type=int)
     parser.add_argument('--device', default='cuda:0',type=str)
     parser.add_argument('--print_epoch', default=1,type=int)
-    parser.add_argument('--batch_size', type=int, default=32)
+    parser.add_argument('--batch_size', type=int, default=64)
     parser.add_argument('--img_size', type=int, default=32)
     parser.add_argument('--data_root', default='../../data')
 
 
-    parser.add_argument('--model', default='doser', help='Proser | efficient_Proser | doser')
-    parser.add_argument('--backbone', default='WideResnet', help='WideResnet | Toy')
+    parser.add_argument('--model', default='doser_nodisentangle', help='Proser | efficient_Proser | doser | doser_nodisentangle ')
+    parser.add_argument('--backbone', default='Toy', help='WideResnet | Toy')
     parser.add_argument('--dataset', type=str, default='cifar10', help="mnist | svhn | cifar10 | tiny_imagenet")
-    parser.add_argument('--param_schedule', type=int, default=10, help='epoch to schedule parameters')
-    parser.add_argument('--param_step', type=float, default=0.02, help='epoch to schedule parameters')
+    parser.add_argument('--param_schedule', type=int, default=8, help='epoch to schedule parameters')
+    parser.add_argument('--param_step', type=float, default=0.03, help='epoch to schedule parameters')
     parser.add_argument('--lr_schedule', type=bool,default=True )
 
 
     parser.add_argument('--lr', default=0.0003, type=float)
-    parser.add_argument('--lambda1', default=0, type=float, help='ratio to keep original representation while doing manifold mix-up')
-    parser.add_argument('--a', default= 0.5, type=float, help = 'weight for the mix loss')
+    parser.add_argument('--lambda1', default=0.2, type=float, help='ratio to keep original representation while doing manifold mix-up')
+    parser.add_argument('--a', default= 0.1, type=float, help = 'weight for the mix loss')
     parser.add_argument('--b', default= 1, type=float, help='weight for the class loss')
     parser.add_argument('--c', default= 1, type=float, help = 'weight for the mute loss')
-    parser.add_argument('--d', default= 0.5, type=float, help = 'weight for the reconloss')
+    parser.add_argument('--d', default= 0.3, type=float, help = 'weight for the reconloss')
 
     # val and save
-    parser.add_argument('--checkpoint', default=None)
+    parser.add_argument('--checkpoint', default='results/new_pretrain_doser_cifar10_Toy_epoch30_lr0.0003_fold1.pth', type=str)
     parser.add_argument('--validate', type=bool, default=False)
     parser.add_argument('--save_model', type=bool, default=True)
     parser.add_argument('--save_path', default='./results')
+    parser.add_argument('--analysis', type=bool, default=False)
     args = parser.parse_args()
 
   

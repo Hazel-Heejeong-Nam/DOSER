@@ -23,14 +23,14 @@ Our code hierarchy would be look like
 DOSER
 ├── models
 │      ├── __init__.py
-│      └── base.py
-│      └── doser.py
+│      ├──  base.py
+│      ├──  doser.py
 │      └── proser.py
 ├── utils
 │      ├── __init__.py
 │      ├── data.py
 │      ├── util.py
-│      ├── wide_resnet.py
+│      └── wide_resnet.py
 ├── main.py
 ├── split.py
 └── train.py
